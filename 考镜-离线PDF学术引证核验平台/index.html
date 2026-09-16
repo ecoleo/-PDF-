@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1280" />
+<meta name="canvas:aspect-ratio" content="16:10" />
+<meta name="canvas:width" content="1440" />
+<meta name="canvas:height" content="900" />
+<title>考镜 · 离线PDF学术引证核验平台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link rel="stylesheet" href="styles/app.css" />
+</head>
+<body>
+<div class="app" id="app" data-right-collapsed="false">
+
+  <aside class="sidebar" data-component="sidebar">
+    <div class="brand">
+      <div class="brand-mark">考</div>
+      <div class="brand-text">
+        <div class="brand-title">考镜</div>
+        <div class="brand-sub">离线PDF学术引证核验平台</div>
+      </div>
+    </div>
+
+    <div class="side-section">
+      <div class="side-label">工作区</div>
+      <nav class="nav" id="mainNav">
+        <button class="nav-item active" data-view="library">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3.5A1.5 1.5 0 013.5 2H7l1 1.5h4.5A1.5 1.5 0 0114 5v7.5a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 12.5v-9z"/></svg>
+          <span>文档库</span><span class="nav-badge" id="navDocCount">0</span>
+        </button>
+        <button class="nav-item" data-view="search">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
+          <span>搜索</span><span class="nav-badge" id="navHitCount">0</span>
+        </button>
+        <button class="nav-item" data-view="verify">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 8.5l3 3 8-8"/><path d="M13.5 8v5.5h-11V2.5H8"/></svg>
+          <span>引用核验</span><span class="nav-badge" id="navVerifyCount">0</span>
+        </button>
+        <button class="nav-item" data-view="ocr">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M5 7h6M5 10h4"/></svg>
+          <span>OCR 队列</span><span class="nav-badge" id="navOcrCount">0</span>
+        </button>
+        <button class="nav-item" data-view="trash">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9a1 1 0 001 .9h4.6a1 1 0 001-.9L12 4"/><path d="M6.5 7v4M9.5 7v4"/></svg>
+          <span>回收站</span><span class="nav-badge" id="navTrashCount">0</span>
+        </button>
+        <button class="nav-item" data-view="storage">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="8" cy="4" rx="5.5" ry="2"/><path d="M2.5 4v8c0 1.1 2.46 2 5.5 2s5.5-.9 5.5-2V4"/><path d="M2.5 8c0 1.1 2.46 2 5.5 2s5.5-.9 5.5-2"/></svg>
+          <span>存储与隐私</span>
+        </button>
+      </nav>
+    </div>
+
+    <div class="side-section">
+      <div class="side-label">文档类型</div>
+      <div class="side-filters" id="typeFilters">
+        <button class="filter-chip active" data-type="all"><span class="filter-dot" style="background:var(--neutral-500)"></span><span>全部</span><span class="filter-count" id="cntAll">0</span></button>
+        <button class="filter-chip" data-type="text"><span class="filter-dot"></span><span>文字版</span><span class="filter-count" id="cntText">0</span></button>
+        <button class="filter-chip" data-type="scanned"><span class="filter-dot"></span><span>扫描版</span><span class="filter-count" id="cntScanned">0</span></button>
+        <button class="filter-chip" data-type="image"><span class="filter-dot"></span><span>图片版</span><span class="filter-count" id="cntImage">0</span></button>
+      </div>
+    </div>
+
+    <div class="side-footer">
+      <div class="user-chip" id="userChip" title="当前使用者（数据独立存储）">
+        <span class="user-avatar" id="userAvatar">·</span>
+        <span class="user-info">
+          <span class="user-name" id="userName">未选择</span>
+          <span class="user-sub">本地独立空间</span>
+        </span>
+        <button class="user-switch" id="btnSwitchUser" title="切换使用者">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 6h10l-3-3M14 10H4l3 3"/></svg>
+        </button>
+      </div>
+      <div class="privacy-note">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 1.5l5 2v4.5c0 3-2 5.5-5 6.5-3-1-5-3.5-5-6.5V3.5l5-2z"/><path d="M6 8l1.5 1.5L10.5 6.5"/></svg>
+        <span>全部数据仅保存在本机浏览器 IndexedDB，不上传任何服务器。</span>
+      </div>
+      <button class="side-btn primary" id="btnUploadSide">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v10M3 8h10"/></svg>
+        上传 PDF
+      </button>
+    </div>
+  </aside>
+
+  <header class="topbar" data-component="topbar">
+    <div class="search-wrap">
+      <div class="search-box">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" style="color:var(--muted-2)"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
+        <input class="search-input" id="globalSearch" placeholder="搜索关键词或整句，例如：合同双方应于签署后 30 日内履行" />
+        <button class="search-mode" id="searchModeBtn" title="切换匹配模式">
+          <span id="searchModeLabel">精确短语</span>
+          <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg>
+        </button>
+        <span class="search-kbd">⌘K</span>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <select class="lang-select" id="ocrLangSelect" title="OCR 识别语言">
+        <option value="chi_sim+eng">中文简体 + 英文</option>
+        <option value="eng">仅英文</option>
+        <option value="chi_sim">仅中文简体</option>
+        <option value="chi_tra+eng">中文繁体 + 英文</option>
+        <option value="jpn+eng">日文 + 英文</option>
+      </select>
+      <div class="storage-pill" title="本地存储占用">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="8" cy="4" rx="5.5" ry="2"/><path d="M2.5 4v8c0 1.1 2.46 2 5.5 2s5.5-.9 5.5-2V4"/></svg>
+        <div class="storage-bar"><div class="storage-fill" id="topStorageFill" style="width:0%"></div></div>
+        <span id="topStorageText">0 MB</span>
+      </div>
+      <button class="icon-btn" id="btnToggleRight" title="折叠/展开右侧栏">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M10 2.5v11"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <section class="view active" id="view-library" data-component="doc-library">
+      <div class="view-header">
+        <div>
+          <div class="view-title">文档库</div>
+          <div class="view-sub" id="librarySub">共 0 份文档 · 0 页 · 0 字</div>
+        </div>
+        <div class="view-actions">
+          <button class="btn" id="btnLoadSample">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 8h12M8 2v12"/></svg>
+            载入示例
+          </button>
+          <button class="btn primary" id="btnUploadTop">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 12V3M4.5 6.5L8 3l3.5 3.5M2.5 13h11"/></svg>
+            上传 PDF
+          </button>
+        </div>
+      </div>
+      <div class="view-body library-body">
+        <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="上传 PDF 文件">
+          <div class="dropzone-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+          </div>
+          <div class="dropzone-text">
+            <div class="dropzone-title">拖拽 PDF 到此处，或点击选择文件</div>
+            <div class="dropzone-desc">支持文字版、扫描版、图片版 PDF · 批量上传 · 单文件最大 600 MB · 全部本地处理</div>
+          </div>
+          <div class="dropzone-cta"><button class="btn" id="btnBrowse">浏览文件</button></div>
+        </div>
+
+        <div class="section-head">
+          <div class="section-title">已上传文档</div>
+          <div class="section-count" id="docCountLabel">0 份</div>
+          <div class="section-tools">
+            <label class="sel-toggle" id="selAllWrap" title="全选/取消全选">
+              <input type="checkbox" id="chkSelectAll" />
+              <span>全选</span>
+            </label>
+            <span class="sel-count" id="selCountLabel">已选 0</span>
+            <button class="btn btn-sm danger" id="btnDeleteSelected" disabled>
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9a1 1 0 001 .9h4.6a1 1 0 001-.9L12 4"/></svg>
+              删除选中
+            </button>
+            <span style="width:1px;height:16px;background:var(--border)"></span>
+            <button class="btn btn-sm ghost" id="btnSortRecent">按时间</button>
+            <button class="btn btn-sm ghost" id="btnSortName">按名称</button>
+          </div>
+        </div>
+        <div id="docGrid" class="doc-grid"></div>
+        <div id="libraryEmpty" class="empty-state">
+          <svg class="empty-illo" viewBox="0 0 120 96" fill="none">
+            <rect x="14" y="14" width="60" height="76" rx="4" fill="var(--illus-bg)" stroke="var(--illus-stroke)" stroke-width="1.5"/>
+            <rect x="26" y="6" width="60" height="76" rx="4" fill="var(--surface)" stroke="var(--illus-stroke)" stroke-width="1.5"/>
+            <path d="M38 24h36M38 34h36M38 44h24M38 54h30M38 64h18" stroke="var(--illus-line)" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="88" cy="70" r="18" fill="var(--highlight)" stroke="var(--highlight-strong)" stroke-width="1.5"/>
+            <path d="M82 70l4 4 8-8" stroke="var(--fg-warning-strong)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <div class="empty-motto">辨章学术，考镜源流；引证有据，精准到页。</div>
+          <div class="empty-title">文档库还是空的</div>
+          <div class="empty-desc">上传 PDF 后系统会自动解析文本层；对扫描版与图片版会调用本地 OCR 引擎（Tesseract.js）识别文字并建立索引。</div>
+          <div class="empty-steps">
+            <div class="empty-step"><div class="empty-step-num">1</div><div class="empty-step-text">上传或拖拽<br/>PDF 文件</div></div>
+            <div class="empty-step"><div class="empty-step-num">2</div><div class="empty-step-text">本地解析<br/>必要时 OCR</div></div>
+            <div class="empty-step"><div class="empty-step-num">3</div><div class="empty-step-text">搜索、定位<br/>核验引用</div></div>
+          </div>
+          <button class="btn primary mt-12" id="btnEmptyLoad">载入示例文档试试</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-search" data-component="search-results">
+      <div class="view-header">
+        <div>
+          <div class="view-title">搜索</div>
+          <div class="view-sub">在全部已索引文档中检索关键词或整句</div>
+        </div>
+        <div class="view-actions"><button class="btn ghost btn-sm" id="btnClearSearch">清空</button></div>
+      </div>
+      <div class="search-body">
+        <div class="search-summary">
+          <div class="search-summary-text" id="searchSummaryText">输入关键词开始检索。支持精确短语、分词模糊、正则三种模式。</div>
+          <div class="filter-row" id="searchFilters">
+            <button class="chip active" data-scope="all">全部文档</button>
+            <button class="chip" data-scope="text">文字版</button>
+            <button class="chip" data-scope="scanned">扫描/图片版</button>
+          </div>
+        </div>
+        <div class="results-list" id="resultsList"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-viewer" data-component="pdf-viewer">
+      <div class="viewer-toolbar">
+        <button class="btn ghost btn-sm" id="btnViewerBack">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 3L5 8l5 5"/></svg>返回
+        </button>
+        <div class="sep"></div>
+        <div class="viewer-pageinfo">
+          <input type="number" id="pageInput" min="1" value="1" /><span>/ <span id="pageTotal">1</span></span>
+        </div>
+        <button class="icon-btn" id="btnPrevPage" title="上一页"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 3L5 8l5 5"/></svg></button>
+        <button class="icon-btn" id="btnNextPage" title="下一页"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3l5 5-5 5"/></svg></button>
+        <div class="sep"></div>
+        <button class="icon-btn" id="btnZoomOut" title="缩小"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8h10"/></svg></button>
+        <span class="viewer-pageinfo" id="zoomLabel" style="min-width:44px;justify-content:center">120%</span>
+        <button class="icon-btn" id="btnZoomIn" title="放大"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3v10M3 8h10"/></svg></button>
+        <button class="icon-btn" id="btnZoomFit" title="适应宽度"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="3" width="12" height="10" rx="1"/><path d="M5 8h6"/></svg></button>
+        <div class="sep"></div>
+        <div class="hit-nav" id="hitNav">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
+          <span id="hitNavText">无命中</span>
+          <button class="icon-btn" id="btnPrevHit" style="width:20px;height:20px" title="上一处"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4-4 4 4"/></svg></button>
+          <button class="icon-btn" id="btnNextHit" style="width:20px;height:20px" title="下一处"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg></button>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+          <span id="viewerDocName" style="font-size:12px;color:var(--muted);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+          <button class="btn primary btn-sm" id="btnAddToVerify">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 8.5l3 3 8-8"/></svg>
+            加入核验
+          </button>
+        </div>
+      </div>
+      <div class="viewer-body"><div class="viewer-scroll" id="viewerScroll"></div></div>
+    </section>
+
+    <section class="view" id="view-verify" data-component="verify-panel">
+      <div class="view-header">
+        <div>
+          <div class="view-title">引用核验</div>
+          <div class="view-sub">左侧为原文命中片段（含上下文），右侧粘贴你的引用文本，系统会逐字对照</div>
+        </div>
+        <div class="view-actions">
+          <button class="btn ghost btn-sm" id="btnVerifyClear">清空</button>
+          <button class="btn btn-sm" id="btnVerifySwap">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 6h10l-3-3M14 10H4l3 3"/></svg>交换
+          </button>
+          <button class="btn primary btn-sm" id="btnVerifyRun">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 8.5l3 3 8-8"/></svg>运行核验
+          </button>
+        </div>
+      </div>
+      <div class="verify-body">
+        <div class="verify-grid">
+          <div class="verify-panel">
+            <div class="verify-panel-head">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 2h7l3 3v9H3z"/><path d="M10 2v3h3"/></svg>
+              原文命中片段<span class="tag tag-original" id="originalMeta">未选择</span>
+            </div>
+            <div class="verify-content" id="verifyOriginal">在搜索结果中点击「加入核验」，或先在文档库选择一份文档、在查看器中选一段命中，系统会自动带上命中前后各 60 字作为上下文。</div>
+          </div>
+          <div class="verify-panel">
+            <div class="verify-panel-head">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 4h12v9H2z"/><path d="M5 4V2h6v2"/></svg>
+              你的引用文本<span class="tag tag-quote">可编辑</span>
+            </div>
+            <textarea class="verify-textarea" id="verifyQuote" placeholder="在此粘贴你在报告、论文或合同中引用的原文，系统会与左侧原文逐字对照，标出：&#10;· 一致的部分（琥珀高亮）&#10;· 引用中多出的字（绿色）&#10;· 引用中缺失的字（红色删除线）"></textarea>
+          </div>
+        </div>
+
+        <div class="verify-result">
+          <div class="verify-verdict" id="verifyVerdict" data-verdict="idle">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3.5M8 11h.01"/></svg>
+            <span id="verifyVerdictText">等待核验</span>
+          </div>
+          <div class="verify-stats">
+            <div class="verify-stat"><span class="verify-stat-value" id="statMatch">—</span><span>匹配字数</span></div>
+            <div class="verify-stat"><span class="verify-stat-value" id="statDel">—</span><span>缺失</span></div>
+            <div class="verify-stat"><span class="verify-stat-value" id="statIns">—</span><span>多出</span></div>
+            <div class="verify-stat"><span class="verify-stat-value" id="statSim">—</span><span>相似度</span></div>
+          </div>
+        </div>
+
+        <div class="verify-citations">
+          <div class="citations-head">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 4h12M2 8h12M2 12h8"/></svg>
+            <div class="citations-title">历史核验记录</div>
+            <div class="citations-count" id="citationsCount">0 条</div>
+            <button class="btn ghost btn-sm" style="margin-left:auto" id="btnExportCitations">导出 JSON</button>
+          </div>
+          <div class="citations-list" id="citationsList">
+            <div style="padding:32px;text-align:center;color:var(--muted);font-size:12px">还没有核验记录。在搜索结果中点击「加入核验」开始第一次比对。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-ocr" data-component="ocr-panel">
+      <div class="view-header">
+        <div>
+          <div class="view-title">OCR 队列</div>
+          <div class="view-sub">本地 Tesseract.js 引擎 · 扫描版与图片版 PDF 的识别进度</div>
+        </div>
+        <div class="view-actions">
+          <button class="btn ghost btn-sm" id="btnRetryFailed">重试失败</button>
+        </div>
+      </div>
+      <div class="ocr-body">
+        <div class="ocr-summary">
+          <div class="stat-card"><div class="stat-label">进行中</div><div class="stat-value" id="ocrStatActive">0</div><div class="stat-trend">正在识别的文档</div></div>
+          <div class="stat-card"><div class="stat-label">已完成</div><div class="stat-value" id="ocrStatDone">0</div><div class="stat-trend up"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 8.5l3 3 8-8"/></svg>已建立索引</div></div>
+          <div class="stat-card"><div class="stat-label">失败</div><div class="stat-value" id="ocrStatFailed">0</div><div class="stat-trend warn">需要重试或检查</div></div>
+          <div class="stat-card"><div class="stat-label">平均置信度</div><div class="stat-value" id="ocrStatConf">—</div><div class="stat-trend">Tesseract.js 报告</div></div>
+        </div>
+        <div class="section-head">
+          <div class="section-title">任务列表</div>
+          <div class="section-count" id="ocrListCount">0 个任务</div>
+        </div>
+        <div id="ocrJobs"></div>
+        <div id="ocrEmpty" class="empty-state">
+          <svg class="empty-illo" viewBox="0 0 120 96" fill="none">
+            <rect x="18" y="18" width="84" height="60" rx="4" fill="var(--warning-soft)" stroke="var(--border-warning)" stroke-width="1.5"/>
+            <path d="M30 34h60M30 44h48M30 54h54M30 64h36" stroke="var(--highlight-strong)" stroke-width="2" stroke-linecap="round" opacity=".5"/>
+            <circle cx="90" cy="70" r="14" fill="var(--surface)" stroke="var(--highlight-strong)" stroke-width="1.5"/>
+            <path d="M84 70l4 4 8-8" stroke="var(--highlight-strong)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <div class="empty-title">当前没有 OCR 任务</div>
+          <div class="empty-desc">上传扫描版或图片版 PDF 后，系统会自动加入此队列并逐页识别。识别完成后会自动建立索引。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-trash" data-component="trash-panel">
+      <div class="view-header">
+        <div>
+          <div class="view-title">回收站</div>
+          <div class="view-sub" id="trashSub">已删除的文档会保留在这里，可恢复或彻底删除</div>
+        </div>
+        <div class="view-actions">
+          <label class="retention-field" title="回收站文档保留天数，超期自动彻底删除">
+            <span>保留</span>
+            <select class="lang-select" id="trashRetentionSelect" style="height:26px">
+              <option value="7">7 天</option>
+              <option value="15">15 天</option>
+              <option value="30">30 天</option>
+              <option value="60">60 天</option>
+              <option value="90">90 天</option>
+              <option value="0">永久（不自动删除）</option>
+            </select>
+          </label>
+          <button class="btn ghost btn-sm" id="btnPurgeNow" disabled>
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2v6M5 5l3 3 3-3M2.5 13h11"/></svg>
+            清理过期项
+          </button>
+          <button class="btn ghost btn-sm" id="btnEmptyTrash" disabled>
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9a1 1 0 001 .9h4.6a1 1 0 001-.9L12 4"/></svg>
+            清空回收站
+          </button>
+        </div>
+      </div>
+      <div class="view-body" style="padding:20px 24px">
+        <div id="trashList"></div>
+        <div id="trashEmpty" class="empty-state">
+          <svg class="empty-illo" viewBox="0 0 120 96" fill="none">
+            <path d="M30 30h60l-5 54a4 4 0 01-4 3.6H39a4 4 0 01-4-3.6L30 30z" fill="var(--illus-bg)" stroke="var(--illus-stroke)" stroke-width="1.5"/>
+            <path d="M24 24h72" stroke="var(--illus-stroke)" stroke-width="3" stroke-linecap="round"/>
+            <path d="M48 20h24v4H48z" fill="var(--illus-stroke)"/>
+            <path d="M48 44v30M60 44v30M72 44v30" stroke="var(--illus-line)" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+          <div class="empty-title">回收站是空的</div>
+          <div class="empty-desc">在文档库勾选文档并删除，或直接删除单个文档，它们会被移到这里。你可以随时恢复，或彻底删除以释放本地空间。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-storage" data-component="storage-panel">
+      <div class="view-header">
+        <div>
+          <div class="view-title">存储与隐私</div>
+          <div class="view-sub">管理本地 IndexedDB 中的文件、索引与核验记录</div>
+        </div>
+      </div>
+      <div class="storage-body">
+        <div class="storage-hero">
+          <div class="storage-hero-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2l8 3.5v6c0 4.5-3.2 8.5-8 10-4.8-1.5-8-5.5-8-10v-6L12 2z"/><path d="M9 12l2 2 4-4"/></svg>
+          </div>
+          <div class="storage-hero-text">
+            <div class="storage-hero-title">完全本地运行，数据不出本机</div>
+            <div class="storage-hero-desc">所有上传的 PDF、OCR 结果、检索索引与核验记录，均保存在当前浏览器的 IndexedDB 中。除了首次加载 PDF.js / Tesseract.js 引擎与语言包（浏览器会缓存）之外，本应用不会向任何服务器发送你的文件、文本或搜索内容。</div>
+          </div>
+          <div class="storage-hero-num">
+            <div class="storage-hero-value" id="heroStorage">0 MB</div>
+            <div class="storage-hero-label">当前本地占用</div>
+          </div>
+        </div>
+
+        <div class="storage-grid">
+          <div class="storage-card">
+            <div class="storage-card-title">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="8" cy="4" rx="5.5" ry="2"/><path d="M2.5 4v8c0 1.1 2.46 2 5.5 2s5.5-.9 5.5-2V4"/></svg>
+              存储构成
+            </div>
+            <div class="storage-bar-lg" role="img" aria-label="本地存储构成条形图">
+              <div class="storage-seg" data-k="files" data-value="0" id="segFiles" style="width:0%" title="PDF 原文件 0 MB"></div>
+              <div class="storage-seg" data-k="ocr" data-value="0" id="segOcr" style="width:0%" title="OCR 文本 0 KB"></div>
+              <div class="storage-seg" data-k="index" data-value="0" id="segIndex" style="width:0%" title="索引 0 KB"></div>
+              <div class="storage-seg" data-k="cite" data-value="0" id="segCite" style="width:0%" title="核验记录 0 KB"></div>
+            </div>
+            <div class="storage-legend">
+              <div class="legend-item"><span class="legend-dot" data-k="files"></span>PDF 原文件 <strong id="lgFiles" data-value="0" style="margin-left:4px;color:var(--fg)">0 MB</strong></div>
+              <div class="legend-item"><span class="legend-dot" data-k="ocr"></span>OCR 文本 <strong id="lgOcr" data-value="0" style="margin-left:4px;color:var(--fg)">0 KB</strong></div>
+              <div class="legend-item"><span class="legend-dot" data-k="index"></span>索引 <strong id="lgIndex" data-value="0" style="margin-left:4px;color:var(--fg)">0 KB</strong></div>
+              <div class="legend-item"><span class="legend-dot" data-k="cite"></span>核验记录 <strong id="lgCite" data-value="0" style="margin-left:4px;color:var(--fg)">0 KB</strong></div>
+            </div>
+            <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+              <div class="storage-row"><span class="storage-row-label">文档总数</span><span class="storage-row-value" id="stDocs">0</span></div>
+              <div class="storage-row"><span class="storage-row-label">总页数</span><span class="storage-row-value" id="stPages">0</span></div>
+              <div class="storage-row"><span class="storage-row-label">索引词条</span><span class="storage-row-value" id="stTokens">0</span></div>
+              <div class="storage-row"><span class="storage-row-label">核验记录</span><span class="storage-row-value" id="stCites">0</span></div>
+              <div class="storage-row"><span class="storage-row-label">回收站</span><span class="storage-row-value" id="stTrash">空</span></div>
+            </div>
+          </div>
+
+          <div class="storage-card">
+            <div class="storage-card-title">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 1.5l5 2v4.5c0 3-2 5.5-5 6.5-3-1-5-3.5-5-6.5V3.5l5-2z"/></svg>
+              数据管理
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+              <div class="setting-row">
+                <div class="setting-text">
+                  <div class="setting-label">回收站保留天数</div>
+                  <div class="setting-desc">超过保留天数的文档会被自动彻底删除；选择「永久」则不自动清理。</div>
+                </div>
+                <select class="lang-select" id="storageRetentionSelect">
+                  <option value="7">7 天</option>
+                  <option value="15">15 天</option>
+                  <option value="30">30 天</option>
+                  <option value="60">60 天</option>
+                  <option value="90">90 天</option>
+                  <option value="0">永久（不自动删除）</option>
+                </select>
+              </div>
+              <button class="btn" id="btnExportAll" style="justify-content:flex-start">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2v8M4.5 6.5L8 10l3.5-3.5M2.5 13h11"/></svg>
+                导出全部索引与核验记录（JSON）
+              </button>
+              <button class="btn" id="btnImportIndex" style="justify-content:flex-start">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 10V2M4.5 5.5L8 2l3.5 3.5M2.5 13h11"/></svg>
+                从 JSON 导入索引
+              </button>
+              <button class="btn danger" id="btnClearAll" style="justify-content:flex-start">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9a1 1 0 001 .9h4.6a1 1 0 001-.9L12 4"/></svg>
+                清空全部本地数据（不可撤销）
+              </button>
+            </div>
+            <div style="margin-top:16px;padding:10px 12px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);font-size:11.5px;color:var(--muted);line-height:1.6">
+              <strong style="color:var(--fg)">提示：</strong>浏览器 IndexedDB 通常可用配额为磁盘剩余空间的 50%–60%。如需长期保存，建议定期导出 JSON 备份。清除浏览器数据会一并删除本应用的所有本地内容。
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <aside class="right-panel" data-component="right-panel">
+    <div class="right-head">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3.5M8 11h.01"/></svg>
+      <div class="right-title" id="rightTitle">详情</div>
+      <button class="icon-btn" id="btnCloseRight" style="margin-left:auto;width:24px;height:24px">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+      </button>
+    </div>
+    <div class="right-body" id="rightBody">
+      <div class="right-section">
+        <div class="right-section-title">当前选择</div>
+        <div id="rightSelection" style="padding:14px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--muted);line-height:1.6;text-align:center">
+          在文档库或搜索结果中选择一项，这里会显示元数据、命中详情与相关命中。
+        </div>
+      </div>
+      <div class="right-section">
+        <div class="right-section-title">OCR 引擎</div>
+        <div class="mini-progress">
+          <div class="mini-progress-head">
+            <span class="status-dot ok" id="engineDot"></span>
+            <span id="engineStatus">就绪</span>
+            <strong id="engineLang">chi_sim+eng</strong>
+          </div>
+          <div class="mini-progress-bar"><div class="mini-progress-fill" id="engineFill" style="width:100%"></div></div>
+        </div>
+      </div>
+      <div class="right-section">
+        <div class="right-section-title">快捷操作</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button class="btn btn-sm" id="qaUpload" style="justify-content:flex-start">上传 PDF</button>
+          <button class="btn btn-sm" id="qaSample" style="justify-content:flex-start">载入示例文档</button>
+          <button class="btn btn-sm" id="qaStorage" style="justify-content:flex-start">查看存储详情</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <footer class="statusbar">
+    <div class="status-item"><span class="status-dot ok" id="statusEngineDot"></span><span id="statusEngine">引擎就绪</span></div>
+    <div class="status-sep"></div>
+    <div class="status-item">
+      <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="8" cy="4" rx="5.5" ry="2"/><path d="M2.5 4v8c0 1.1 2.46 2 5.5 2s5.5-.9 5.5-2V4"/></svg>
+      <span>IndexedDB · <strong id="statusStorage" style="color:var(--fg);font-weight:600">0 MB</strong></span>
+    </div>
+    <div class="status-sep"></div>
+    <div class="status-item">
+      <span>文档 <strong id="statusDocs" style="color:var(--fg);font-weight:600">0</strong></span><span>·</span>
+      <span>页面 <strong id="statusPages" style="color:var(--fg);font-weight:600">0</strong></span><span>·</span>
+      <span>词条 <strong id="statusTokens" style="color:var(--fg);font-weight:600">0</strong></span>
+    </div>
+    <div class="status-right">
+      <span class="status-item">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1.5l5 2v4.5c0 3-2 5.5-5 6.5-3-1-5-3.5-5-6.5V3.5l5-2z"/></svg>
+        <span>本地模式 · 数据不出本机</span>
+      </span>
+    </div>
+  </footer>
+</div>
+
+<input type="file" id="fileInput" accept="application/pdf,.pdf" multiple style="display:none" />
+<input type="file" id="importInput" accept="application/json,.json" style="display:none" />
+<div class="toast-wrap" id="toastWrap"></div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-head">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--danger)" stroke-width="1.6"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.5v4M8 11h.01"/></svg>
+      <div class="modal-title" id="modalTitle">确认清空全部本地数据？</div>
+    </div>
+    <div class="modal-body" id="modalBody">此操作会删除 IndexedDB 中所有 PDF 文件、OCR 文本、检索索引与核验记录，且不可撤销。建议先导出 JSON 备份。</div>
+    <div class="modal-foot">
+      <button class="btn" id="modalCancel">取消</button>
+      <button class="btn danger" id="modalConfirm">确认清空</button>
+    </div>
+  </div>
+</div>
+
+<div class="profile-gate" id="profileGate">
+  <div class="gate-card">
+    <div class="gate-brand">
+      <div class="brand-mark" style="width:36px;height:36px;border-radius:9px;font-size:15px">考</div>
+      <div>
+        <div class="gate-title">考镜 · 离线PDF学术引证核验平台</div>
+        <div class="gate-motto">辨章学术，考镜源流；引证有据，精准到页。</div>
+        <div class="gate-sub">请选择或新建你的使用者档案 · 每个档案的数据独立存储，互不可见</div>
+      </div>
+    </div>
+
+    <div class="gate-section" id="gateListSection">
+      <div class="gate-label">本机使用者</div>
+      <div class="gate-profiles" id="gateProfiles"></div>
+    </div>
+
+    <div class="gate-section" id="gateCreateSection">
+      <div class="gate-label" id="gateCreateLabel">新建使用者档案</div>
+      <div class="gate-form">
+        <input class="gate-input" id="gateName" type="text" maxlength="24" placeholder="使用者名称，例如：张三 / 法务部" autocomplete="off" />
+        <input class="gate-input" id="gatePin" type="password" maxlength="32" placeholder="访问密码 PIN（可选，留空则不锁）" autocomplete="new-password" />
+        <button class="btn primary" id="gateCreateBtn" style="height:34px;justify-content:center">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v10M3 8h10"/></svg>
+          创建并进入
+        </button>
+      </div>
+      <div class="gate-hint">档案与密码仅保存在本机浏览器，不会上传。密码用于防止同机他人随意打开你的空间，属轻量防护，并非强加密。</div>
+    </div>
+
+    <div class="gate-section hidden" id="gateUnlockSection">
+      <div class="gate-label">输入密码解锁 <span id="unlockName" style="color:var(--primary)"></span></div>
+      <div class="gate-form">
+        <input class="gate-input" id="gateUnlockPin" type="password" maxlength="32" placeholder="访问密码 PIN" autocomplete="current-password" />
+        <button class="btn primary" id="gateUnlockBtn" style="height:34px;justify-content:center">解锁进入</button>
+        <button class="btn ghost" id="gateUnlockCancel" style="height:34px;justify-content:center">返回</button>
+      </div>
+      <div class="gate-hint" id="unlockError" style="color:var(--danger);display:none">密码不正确，请重试。</div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
